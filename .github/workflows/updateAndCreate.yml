@@ -23,10 +23,10 @@ jobs:
       id: sync
       uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
       with:
-        target_sync_branch: master
+        target_sync_branch: main
         target_repo_token: ${{ secrets.GITHUB_TOKEN }}
-        upstream_sync_branch: master
-        upstream_sync_repo: yuzu-emu/yuzu
+        upstream_sync_branch: main
+        upstream_sync_repo: darkluar/cosmic-station
         upstream_pull_args: '-s recursive -Xtheirs'
         target_branch_push_args: --force
         test_mode: false 
