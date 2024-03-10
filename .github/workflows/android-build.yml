@@ -67,7 +67,7 @@ jobs:
           CMAKE_C_COMPILER_LAUNCHER: "ccache"
           CMAKE_CXX_COMPILER_LAUNCHER: "ccache"
           CCACHE_COMPILERCHECK: "string:${{ env.NDK_VERSION }}"
-        run: ./gradlew --stacktrace --build-cache --parallel --configure-on-demand assembleMainlineRelease assembleMainlineReldebug
+        run: ./gradlew assembleMainlineRelease assembleMainlineReldebug
 
       - name: Rename APKs (Signed)
         if: env.IS_BUILD_SIGNED == 'true' && env.UPLOAD_ARTIFACTS == 'true'
