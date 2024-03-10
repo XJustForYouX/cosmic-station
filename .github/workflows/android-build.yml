@@ -72,8 +72,8 @@ jobs:
       - name: Rename APKs (Signed)
         if: env.IS_BUILD_SIGNED == 'true' && env.UPLOAD_ARTIFACTS == 'true'
         run: |
-          mv app/build/outputs/apk/mainline/reldebug/app-mainline-reldebug.apk cosmic-$GITHUB_RUN_NUMBER-reldebug.apk
-          mv app/build/outputs/apk/mainline/release/app-mainline-release.apk cosmic-$GITHUB_RUN_NUMBER-release.apk
+          mv app/src/main/build/outputs/apk/mainline/reldebug/app-mainline-reldebug.apk cosmic-$GITHUB_RUN_NUMBER-reldebug.apk
+          mv app/src/main/build/outputs/apk/mainline/release/app-mainline-release.apk cosmic-$GITHUB_RUN_NUMBER-release.apk
 
       - name: Upload Signed Debug APK
         if: env.IS_BUILD_SIGNED == 'true' && env.UPLOAD_ARTIFACTS == 'true'
@@ -92,8 +92,8 @@ jobs:
       - name: Rename APKs (Unsigned)
         if: env.IS_BUILD_SIGNED == 'false' && env.UPLOAD_ARTIFACTS == 'true'
         run: |
-          mv app/build/outputs/apk/mainline/reldebug/app-mainline-reldebug.apk cosmic-$GITHUB_RUN_NUMBER-unsigned-reldebug.apk
-          mv app/build/outputs/apk/mainline/release/app-mainline-release.apk cosmic-$GITHUB_RUN_NUMBER-unsigned-release.apk
+          mv app/src/main/build/outputs/apk/mainline/reldebug/app-mainline-reldebug.apk cosmic-$GITHUB_RUN_NUMBER-unsigned-reldebug.apk
+          mv app/src/main/build/outputs/apk/mainline/release/app-mainline-release.apk cosmic-$GITHUB_RUN_NUMBER-unsigned-release.apk
 
       - name: Upload Unsigned Debug APK
         if: env.IS_BUILD_SIGNED == 'false' && env.UPLOAD_ARTIFACTS == 'true'
