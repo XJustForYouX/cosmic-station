@@ -79,8 +79,8 @@ jobs:
         if: env.IS_BUILD_SIGNED == 'true' && env.UPLOAD_ARTIFACTS == 'true'
         uses: actions/upload-artifact@v3
         with:
-          name: strato-${{ github.run_number }}-reldebug.apk
-          path: strato-${{ github.run_number }}-reldebug.apk
+          name: cosmic-${{ github.run_number }}-reldebug.apk
+          path: cosmic-${{ github.run_number }}-reldebug.apk
 
       - name: Upload Signed Release APK
         if: env.IS_BUILD_SIGNED == 'true' && env.UPLOAD_ARTIFACTS == 'true'
