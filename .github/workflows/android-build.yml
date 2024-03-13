@@ -15,7 +15,7 @@ jobs:
       IS_BUILD_SIGNED: ${{ secrets.KEYSTORE != '' }}
       UPLOAD_ARTIFACTS: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
       CMAKE_VERSION: "3.22.1"
-      NDK_VERSION: "26.1.10909125"
+      NDK_VERSION: "25.1.8937393"
 
     steps:
       - name: Git Checkout
