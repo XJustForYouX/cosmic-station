@@ -1,25 +1,16 @@
-name: CI
+# A workflow to verify the build on every push to the master branch
+name: Build
 
 on:
-  workflow_dispatch:
+  push: 
+    branches: [ main ]
+
 jobs:
   build:
-    # Skip 'labeled' events that didn't add the 'ci' label
-    if: |
-      github.event_name != 'pull_request' ||
-      github.event.action != 'labeled' ||
-      github.event.label.name == 'ci'
     runs-on: ubuntu-latest
-    env:
-      JVM_OPTS: -Xmx6G
-      IS_BUILD_SIGNED: ${{ secrets.KEYSTORE != '' }}
-      UPLOAD_ARTIFACTS: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
-      CMAKE_VERSION: "3.22.1"
-      NDK_VERSION: "25.1.8937393"
-
     steps:
       - name: Git Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
@@ -29,7 +20,7 @@ jobs:
           max-size: 3Gi
 
       - name: Restore Gradle Cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.gradle/
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/build.gradle') }}-${{ hashFiles('app/**/*.xml') }}-${{ hashFiles('app/**.kt', 'app/**.java') }}
@@ -49,62 +40,9 @@ jobs:
           sudo apt-get install -y ninja-build
           ln -s /usr/bin/ninja .
 
-      - name: Install CMake & Android NDK
-        run: echo "yes" | $ANDROID_HOME/tools/bin/sdkmanager "cmake;${{ env.CMAKE_VERSION }}" "ndk;${{ env.NDK_VERSION }}" --channel=3 | grep -v = || true
-
-      - name: Decode Keystore
-        if: env.IS_BUILD_SIGNED == 'true'
-        env:
-          KEYSTORE_ENCODED: ${{ secrets.KEYSTORE }}
-        run: echo $KEYSTORE_ENCODED | base64 --decode > "/home/runner/keystore.jks"
-
       - name: Android Assemble
         env:
-          SIGNING_STORE_PATH: "/home/runner/keystore.jks"
-          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
           CMAKE_C_COMPILER_LAUNCHER: "ccache"
           CMAKE_CXX_COMPILER_LAUNCHER: "ccache"
-          CCACHE_COMPILERCHECK: "string:${{ env.NDK_VERSION }}"
-        run: ./gradlew --build-cache --parallel --configure-on-demand assembleMainlineRelease assembleMainlineReldebug
-
-      - name: Rename APKs (Signed)
-        if: env.IS_BUILD_SIGNED == 'true' && env.UPLOAD_ARTIFACTS == 'true'
-        run: |
-          mv app/src/main/build/outputs/apk/mainline/reldebug/app-mainline-reldebug.apk cosmic-$GITHUB_RUN_NUMBER-reldebug.apk
-          mv app/src/main/build/outputs/apk/mainline/release/app-mainline-release.apk cosmic-$GITHUB_RUN_NUMBER-release.apk
-
-      - name: Upload Signed Debug APK
-        if: env.IS_BUILD_SIGNED == 'true' && env.UPLOAD_ARTIFACTS == 'true'
-        uses: actions/upload-artifact@v3
-        with:
-          name: cosmic-${{ github.run_number }}-reldebug.apk
-          path: cosmic-${{ github.run_number }}-reldebug.apk
-
-      - name: Upload Signed Release APK
-        if: env.IS_BUILD_SIGNED == 'true' && env.UPLOAD_ARTIFACTS == 'true'
-        uses: actions/upload-artifact@v3
-        with:
-          name: strato-${{ github.run_number }}-release.apk
-          path: strato-${{ github.run_number }}-release.apk
-
-      - name: Rename APKs (Unsigned)
-        if: env.IS_BUILD_SIGNED == 'false' && env.UPLOAD_ARTIFACTS == 'true'
-        run: |
-          mv app/src/main/build/outputs/apk/mainline/reldebug/app-mainline-reldebug.apk cosmic-$GITHUB_RUN_NUMBER-unsigned-reldebug.apk
-          mv app/src/main/build/outputs/apk/mainline/release/app-mainline-release.apk cosmic-$GITHUB_RUN_NUMBER-unsigned-release.apk
-
-      - name: Upload Unsigned Debug APK
-        if: env.IS_BUILD_SIGNED == 'false' && env.UPLOAD_ARTIFACTS == 'true'
-        uses: actions/upload-artifact@v3
-        with:
-          name: cosmic-${{ github.run_number }}-unsigned-reldebug.apk
-          path: cosmic-${{ github.run_number }}-unsigned-reldebug.apk
-
-      - name: Upload Unsigned Release APK
-        if: env.IS_BUILD_SIGNED == 'false' && env.UPLOAD_ARTIFACTS == 'true'
-        uses: actions/upload-artifact@v3
-        with:
-          name: cosmic-${{ github.run_number }}-unsigned-release.apk
-          path: cosmic-${{ github.run_number }}-unsigned-release.apk
+          CCACHE_COMPILERCHECK: "string:${{ env.NDK_VERSION }}" # Use NDK version instead of compiler timestamp
+        run: ./gradlew --no-daemon --stacktrace --build-cache --parallel --configure-on-demand assembleMainlineRelease
