@@ -21,7 +21,7 @@ jobs:
           java-version: '1.7'
 
       - name: Setup Android SDK
-        uses: actions/setup-android-sdk@v2
+        uses: actions/setup-android-sdk@v3
         with:
           sdk-platform: 'android-34'
           ndk-version: '25.1.8937393'
