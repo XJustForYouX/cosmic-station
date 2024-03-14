@@ -100,3 +100,87 @@ dependencies {
 kapt {
     correctErrorTypes = true
 }
+
+/**
+ * Returns the version name based on the current git state
+ * If HEAD is a tag, the tag name is used as the version name
+ * e.g. `1.0.0`
+ * If HEAD is not a tag, the closest tag name, the branch name and the short commit hash are used
+ * e.g. `1.0.0-master-ab00cd11`
+ * If PR_NUMBER is set, prPR_NUMBER is used instead of the branch name
+ * e.g. `1.0.0-pr123-ab00cd11`
+ */
+def getGitVersionName() {
+    def versionName = '0.0.0'
+
+    try {
+        // Check if HEAD is a tag
+        def process = 'git describe --exact-match'.execute([], project.rootDir)
+        def isTag = process.waitFor() == 0
+
+        // Use the tag name as the version name
+        def tag = 'git describe --abbrev=0'.execute([], project.rootDir).text.trim()
+        if (!tag.isEmpty())
+            versionName = tag
+
+        // If HEAD is not a tag, append the branch name and the short commit hash
+        if (!isTag)
+            versionName += '-' + getGitBranch() + '-' + getGitShortHash()
+    } catch (Exception e) {
+        logger.quiet(e.toString() + ': defaulting to dummy version number ' + versionName)
+    }
+
+    logger.quiet('Version name: ' + versionName)
+    return versionName
+}
+
+/**
+ * Returns the number of commits until the last tag
+ */
+def getGitVersionCode() {
+    def versionCode = 1
+
+    try {
+        versionCode = Integer.max('git rev-list --first-parent --count --tags'.execute([], project.rootDir).text
+                .toInteger(), versionCode)
+    } catch (Exception e) {
+        logger.error(e.toString() + ': defaulting to dummy version code ' + versionCode)
+    }
+
+    logger.quiet('Version code: ' + versionCode)
+    return versionCode
+}
+
+/**
+ * Returns the short commit hash
+ */
+def getGitShortHash() {
+    def gitHash = '0'
+
+    try {
+        gitHash = 'git rev-parse --short HEAD'.execute([], project.rootDir).text.trim()
+    } catch (Exception e) {
+        logger.error(e.toString() + ': defaulting to dummy build hash ' + gitHash)
+    }
+
+    return gitHash
+}
+
+/**
+ * Returns the current branch name, or prPR_NUMBER if PR_NUMBER is set
+ */
+def getGitBranch() {
+    def branch = 'unk'
+
+    try {
+        def prNumber = System.getenv('PR_NUMBER') ?: ''
+        if (!prNumber.isEmpty())
+            branch = 'pr' + prNumber
+        else
+            branch = 'git rev-parse --abbrev-ref HEAD'.execute([], project.rootDir).text.trim()
+    } catch (Exception e) {
+        logger.error(e.toString() + ': defaulting to dummy branch ' + branch)
+    }
+
+    return branch
+}
