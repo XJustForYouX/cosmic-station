@@ -47,9 +47,6 @@ jobs:
           CCACHE_COMPILERCHECK: "string:${{ env.NDK_VERSION }}" # Use NDK version instead of compiler timestamp
         run: ./gradlew --no-daemon --stacktrace --build-cache --parallel --configure-on-demand assembleMainlineRelease
 
-        - name: Grant execute permission to Gradle wrapper
-        run: chmod +x ./gradlew
-
       - name: Build APK
         run: ./gradlew assembleRelease
 
