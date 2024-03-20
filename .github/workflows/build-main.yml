@@ -52,7 +52,7 @@ jobs:
       
       - name: Build APK
         run: |
-          cd src/android
+          cd cosmic-station\cosmic-station\src\android
           .\gradlew.bat assembleRelease
         env:
           ALLOW_EXTERNAL_SPIRV_TOOLS: ON
