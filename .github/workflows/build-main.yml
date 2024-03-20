@@ -51,11 +51,7 @@ jobs:
           choco install git
       
       - name: Build APK
-        run: |
-          cd cosmic-station\cosmic-station\src\android
-          .\gradlew.bat assembleRelease
-        env:
-          ALLOW_EXTERNAL_SPIRV_TOOLS: ON
+        run: .\gradlew.bat assembleRelease
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
