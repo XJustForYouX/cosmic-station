@@ -1,57 +1,67 @@
-# A workflow to verify the build on every push to the master branch
-name: Build
+name: sudachi-android-build
 
 on:
-  push: 
-    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'select branch to build(default: main)'
+        required: false
+        default: 'main'
 
 jobs:
-  build:
+  sudachi_android_build:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
-      - name: Git Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: 17
 
-      - name: Restore CCache
-        uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          max-size: 3Gi
+    - name: Download sudachi source code
+      run: |
+        cd ${{ github.workspace }}
+        git clone --branch ${{ github.event.inputs.branch || 'main' }} https://github.com/sudachi-emu/sudachi.git --recursive
 
-      - name: Restore Gradle Cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.gradle/
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/build.gradle') }}-${{ hashFiles('app/**/*.xml') }}-${{ hashFiles('app/**.kt', 'app/**.java') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-${{ hashFiles('**/build.gradle') }}-${{ hashFiles('app/**/*.xml') }}-
-            ${{ runner.os }}-gradle-${{ hashFiles('**/build.gradle') }}-
-            ${{ runner.os }}-gradle-
+    - id: version
+      name: Get version
+      run: |
+        echo "date=$(/bin/date -u "+%Y%m%d")" >> $GITHUB_OUTPUT
+        cd ${{ github.workspace }}/sudachi
+        echo "hash=$(git log -1 --pretty=format:%H)" >> $GITHUB_OUTPUT
+        echo "short_hash=$(git describe --always --long)" >> $GITHUB_OUTPUT
+        echo "version=$(git describe --tags --always)" >> $GITHUB_OUTPUT
 
-      - name: Install Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin' # Temurin should come pre-installed on GitHub-hosted runners
-          java-version: '17'
+    - name: Set up cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+          ~/.ccache
+        key: ${{ runner.os }}-android-${{ steps.version.outputs.hash }}
+        restore-keys: |
+            ${{ runner.os }}-android-
 
-      - name: Install Ninja Build
-        run: |
-          sudo apt-get install -y ninja-build
-          ln -s /usr/bin/ninja .
+    - name: Prepare environment
+      run: |
+        sudo apt-get install ccache glslang-dev glslang-tools
 
-      - name: Android Assemble
-        env:
-          CMAKE_C_COMPILER_LAUNCHER: "ccache"
-          CMAKE_CXX_COMPILER_LAUNCHER: "ccache"
-          CCACHE_COMPILERCHECK: "string:${{ env.NDK_VERSION }}" # Use NDK version instead of compiler timestamp
-        run: ./gradlew --no-daemon --stacktrace --build-cache --parallel --configure-on-demand assembleMainlineRelease
+    - name: Build Android
+      run: |
+        export NDK_CCACHE="$(which ccache)"
+        ccache -s
+        cd ${{ github.workspace }}/sudachi/src/android
+        chmod +x ./gradlew
+        ./gradlew "assembleMainlineRelease"
+        mv app/build/outputs/apk/mainline/release/app-mainline-release.apk ${{ github.workspace }}/sudachi-${{ steps.version.outputs.date }}-${{ steps.version.outputs.version }}.apk
+        ccache -s
 
-      - name: Build APK
-        run: ./gradlew assembleRelease
-
-      - name: Publish artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release
-          path: app/build/outputs/apk/release/*.apk
+    - name: Release Sudachi
+      uses: softprops/action-gh-release@v2
+      with:
+        name: ${{ steps.version.outputs.date }}
+        tag_name: ${{ steps.version.outputs.date }}
+        body: Latest Sudachi build for Android on ${{ steps.version.outputs.date }} with version ${{ steps.version.outputs.version }}
+        files: ${{ github.workspace }}/sudachi-${{ steps.version.outputs.date }}-${{ steps.version.outputs.version }}.apk
