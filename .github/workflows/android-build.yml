@@ -19,7 +19,7 @@ jobs:
         distribution: temurin
         java-version: 17
 
-    - name: Download sudachi source code
+    - name: Download cosmic-station source code
       run: |
         cd ${{ github.workspace }}
         git clone --branch ${{ github.event.inputs.branch || 'main' }} https://github.com/XJustForYouX/cosmic-station.git --recursive
@@ -52,10 +52,10 @@ jobs:
       run: |
         export NDK_CCACHE="$(which ccache)"
         ccache -s
-        cd ${{ github.workspace }}/coscmic-station/app/
+        cd ${{ github.workspace }}/cosmic-station/app/
         chmod +x ./gradlew
-        ./gradlew "assembleRelease"
-        mv app/build/outputs/apk/release/app-release.apk ${{ github.workspace }}/cosmic-${{ steps.version.outputs.date }}-${{ steps.version.outputs.version }}.apk
+        ./gradlew "assembleDevRelease"
+        mv app/build/outputs/apk/dev/release/app-dev-release.apk ${{ github.workspace }}/cosmic-${{ steps.version.outputs.date }}-${{ steps.version.outputs.version }}.apk
         ccache -s
 
     - name: Release Cosmic Station
@@ -64,4 +64,4 @@ jobs:
         name: ${{ steps.version.outputs.date }}
         tag_name: ${{ steps.version.outputs.date }}
         body: Latest Cosmic build for Android on ${{ steps.version.outputs.date }} with version ${{ steps.version.outputs.version }}
-        files: ${{ github.workspace }}/sudachi-${{ steps.version.outputs.date }}-${{ steps.version.outputs.version }}.apk
+        files: ${{ github.workspace }}/cosmic-${{ steps.version.outputs.date }}-${{ steps.version.outputs.version }}.apk
