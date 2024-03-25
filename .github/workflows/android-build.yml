@@ -54,7 +54,7 @@ jobs:
         ccache -s
         cd ${{ github.workspace }}/cosmic-station/app/
         chmod +x ./gradlew
-        ./gradlew "assembleDevRelease"
+        ./gradlew 
         mv app/build/outputs/apk/dev/release/app-dev-release.apk ${{ github.workspace }}/cosmic-${{ steps.version.outputs.date }}-${{ steps.version.outputs.version }}.apk
         ccache -s
 
