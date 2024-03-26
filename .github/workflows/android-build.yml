@@ -1,67 +1,20 @@
-name: cosmic-android-build
-
+name: android
 on:
   workflow_dispatch:
-    inputs:
-      branch:
-        description: 'select branch to build(default: main)'
-        required: false
-        default: 'main'
-
 jobs:
-  cosmic_android_build:
-    permissions:
-      contents: write
+  android:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/setup-java@v4
-      with:
-        distribution: temurin
-        java-version: 17
-
-    - name: Download cosmic-station source code
-      run: |
-        cd ${{ github.workspace }}
-        git clone --branch ${{ github.event.inputs.branch || 'main' }} https://github.com/XJustForYouX/cosmic-station.git --recursive
-
-    - id: version
-      name: Get version
-      run: |
-        echo "date=$(/bin/date -u "+%Y%m%d")" >> $GITHUB_OUTPUT
-        cd ${{ github.workspace }}/cosmic-station
-        echo "hash=$(git log -1 --pretty=format:%H)" >> $GITHUB_OUTPUT
-        echo "short_hash=$(git describe --always --long)" >> $GITHUB_OUTPUT
-        echo "version=$(git describe --tags --always)" >> $GITHUB_OUTPUT
-
-    - name: Set up cache
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-          ~/.ccache
-        key: ${{ runner.os }}-android-${{ steps.version.outputs.hash }}
-        restore-keys: |
-            ${{ runner.os }}-android-
-
-    - name: Prepare environment
-      run: |
-        sudo apt-get install ccache glslang-dev glslang-tools
-
-    - name: Build Android
-      run: |
-        export NDK_CCACHE="$(which ccache)"
-        ccache -s
-        cd ${{ github.workspace }}/cosmic-station/app/
-        chmod +x ./gradlew
-        ./gradlew 
-        mv app/build/outputs/apk/dev/release/app-dev-release.apk ${{ github.workspace }}/cosmic-${{ steps.version.outputs.date }}-${{ steps.version.outputs.version }}.apk
-        ccache -s
-
-    - name: Release Cosmic Station
-      uses: softprops/action-gh-release@v2
-      with:
-        name: ${{ steps.version.outputs.date }}
-        tag_name: ${{ steps.version.outputs.date }}
-        body: Latest Cosmic build for Android on ${{ steps.version.outputs.date }} with version ${{ steps.version.outputs.version }}
-        files: ${{ github.workspace }}/cosmic-${{ steps.version.outputs.date }}-${{ steps.version.outputs.version }}.apk
+      - name: checkout
+        uses: actions/checkout@v4
+        with: 
+          submodules: 'recursive'
+      - name: build
+        run: |
+          cd Source/Android/
+          ./gradlew assembleRelease -Dorg.gradle.java.home=/usr/lib/jvm/temurin-17-jdk-amd64
+      - name: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: cosmic.apk
+          path: Source/Android/app/build/outputs/apk/release/*.apk
