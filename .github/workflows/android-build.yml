@@ -17,4 +17,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cosmic.apk
-          path: Source/Android/app/build/outputs/apk/release/*.apk
+          path: cosmic-station/app/build/outputs/apk/release/*.apk
