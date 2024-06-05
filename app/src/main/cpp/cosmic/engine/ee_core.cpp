@@ -3,8 +3,8 @@
 #include <engine/ee_core.h>
 #include <engine/cop0.h>
 
-#include <creeper/ee/cached_blocks.h>
-#include <fishron/ee2arm/jitter_arm64_ee.h>
+#include <creeper/cached_blocks.h>
+#include <fishron/jitter_arm64_ee.h>
 #include <console/virt_devices.h>
 namespace cosmic::engine {
     EeMipsCore::~EeMipsCore() {
@@ -97,9 +97,9 @@ namespace cosmic::engine {
             if (executor)
                 executor.reset();
             if (cpuMode == CachedInterpreter) {
-                executor = std::make_unique<creeper::ee::MipsIvInterpreter>(*this);
+                executor = std::make_unique<creeper::MipsIvInterpreter>(*this);
             } else if (cpuMode == JitRe) {
-                executor = std::make_unique<fishron::ee2arm::EeArm64Jitter>(*this);
+                executor = std::make_unique<fishron::EeArm64Jitter>(*this);
             }
         });
     }

@@ -1,7 +1,7 @@
 #include <range/v3/algorithm.hpp>
 #include <common/global.h>
 #include <iop/iop_core.h>
-#include <creeper/psx/iop_interpreter.h>
+#include <creeper/iop_interpreter.h>
 #include <pshook/hk_psx.h>
 
 namespace cosmic::iop {
@@ -15,7 +15,7 @@ namespace cosmic::iop {
 
     IoMipsCore::IoMipsCore(std::shared_ptr<mio::MemoryPipe>& pipe) :
         iopMem(pipe) {
-            interpreter = std::make_unique<creeper::psx::IopInterpreter>(*this);
+            interpreter = std::make_unique<creeper::IopInterpreter>(*this);
         for (auto& cache : instCache) {
             cache.data = {};
             cache.tag = {};

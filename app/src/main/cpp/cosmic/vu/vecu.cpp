@@ -4,7 +4,7 @@
 #include <vm/emu_vm.h>
 #include <console/backdoor.h>
 #include <common/global.h>
-#include <creeper/micro/vum_code.h>
+#include "cosmic/creeper/vum_code.h"
 namespace cosmic::vu {
     VuIntPipeline::VuIntPipeline() {
         pipeline[0].clearEntry();
@@ -34,7 +34,7 @@ namespace cosmic::vu {
 
         for (u8 vifI{}; vifI < 2; vifI++)
             vifTops[vifI] = nullptr;
-        exe = std::make_unique<creeper::micro::VuMicroInterpreter>(*this);
+        exe = std::make_unique<creeper::VuMicroInterpreter>(*this);
 
         // vf00 is hardwired to the vector {0.0, 0.0, 0.0, 1.0}
         VuGPRs[0].w = 1.0;
