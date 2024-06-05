@@ -19,5 +19,5 @@
            java-version: 17
 
        - name: Make gradlew executable
-         run: chmod +x ./gradlew assembleRelease
+         run: chmod +x ./gradlew
            
