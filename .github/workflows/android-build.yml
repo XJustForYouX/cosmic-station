@@ -32,8 +32,8 @@ jobs:
           versionCode: '${{ github.run_number }}'
           versionName: 0.0.18
       - name: Build prodRelease
-        run: ./gradlew bundleRelease
-      - name: Sign AAb
+        run: ./gradlew assembleRelease
+      - name: Sign APK
         id: sign
         uses: r0adkll/sign-android-release@v1
         with:
@@ -46,5 +46,5 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: app-bundle
-          path: app/build/outputs/bundle/release/app-release.aab
+          path: app/build/outputs/bundle/release/app-release.apk
       - run: 'echo Build status report=${{ job.status }}'
