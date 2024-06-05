@@ -6,9 +6,8 @@ on:
       - main
 
 jobs:
-  apk:
-  name: Build Release signed APK
-  runs-on: ubuntu-latest
+  android:
+    runs-on: ubuntu-latest
   steps:
     - name: Checkout the code
       uses: actions/checkout@v2
