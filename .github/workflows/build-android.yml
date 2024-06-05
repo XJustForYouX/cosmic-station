@@ -18,8 +18,6 @@
          with:
            java-version: 17
 
-       - name: Build project and generate APK
-         run: |
-           # Add your build commands here
-           ./gradlew assembleRelease
+       - name: Make gradlew executable
+         run: chmod +x ./gradlew assembleRelease
            
