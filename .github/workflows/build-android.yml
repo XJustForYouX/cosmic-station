@@ -19,5 +19,22 @@
            java-version: 17
 
        - name: Make gradlew executable
-         run: chmod +x ./gradlew
+        run: chmod +x ./gradlew
+      - name: Setup Gradle Cache
+        uses: gradle/gradle-build-action@v2
+        with:
+          gradle-home-cache-cleanup: true
+      - name: Bump Version Code
+        uses: chkfung/android-version-actions@v1.2.1
+        with:
+          gradlePath: app/build.gradle.kts
+          versionCode: '${{ github.run_number }}'
+          versionName: 1.0.0
+      - name: Build prodRelease
+        run: ./gradlew bundleRelease
+      - name: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: cosmic.apk
+          path: cosmic-station/app/build/outputs/apk/release/*.apk
            
