@@ -4,8 +4,9 @@ on:
   push:
     branches:
       - main
-      
-apk:
+
+jobs:
+  apk:
   name: Build Release signed APK
   runs-on: ubuntu-latest
   steps:
