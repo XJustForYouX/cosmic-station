@@ -1,18 +1,25 @@
-     name: Build
+   name: Build APK
 
-     on:
-       push:
-         branches:
-           - main
+   on:
+     push:
+       branches:
+         - main
 
-     jobs:
-       build:
-         runs-on: ubuntu-latest
+   jobs:
+     build:
+       runs-on: ubuntu-latest
 
-         steps:
-           - uses: actions/checkout@v2
+       steps:
+       - name: Check out the code
+         uses: actions/checkout@v2
 
-           - name: Install Dependencies
-             run: |
-               npm install
-     
+       - name: Set up JDK
+         uses: actions/setup-java@v1
+         with:
+           java-version: 17
+
+       - name: Build project and generate APK
+         run: |
+           # Add your build commands here
+           ./gradlew assembleRelease
+           
