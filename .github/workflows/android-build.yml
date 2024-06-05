@@ -1,50 +1,113 @@
-name: Build Cosmic Station APK
+name: CI
 
 on:
-  push:
-    branches:
-      - main
-
+  workflow_dispatch:
 jobs:
   build:
+    # Skip 'labeled' events that didn't add the 'ci' label
+    if: |
+      github.event_name != 'pull_request' ||
+      github.event.action != 'labeled' ||
+      github.event.label.name == 'ci'
     runs-on: ubuntu-latest
+    env:
+      JVM_OPTS: -Xmx6G
+      IS_BUILD_SIGNED: ${{ secrets.KEYSTORE != '' }}
+      UPLOAD_ARTIFACTS: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
+      CMAKE_VERSION: "3.22.1"
+      NDK_VERSION: "26.1.10909125"
+
     steps:
-      - uses: actions/checkout@v3
-      - name: Get mapskey.properties from secrets
-        run: >-
-          echo "${{ secrets.MAPS_API_KEY }}" >
-          $GITHUB_WORKSPACE/mapskey.properties
-      - name: Setup JDK 17
-        uses: actions/setup-java@v3
+      - name: Git Checkout
+        uses: actions/checkout@v3
         with:
-          distribution: temurin
-          java-version: 17
+          submodules: recursive
+
+      - name: Restore CCache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          max-size: 3Gi
+
       - name: Make gradlew executable
         run: chmod +x ./gradlew
-      - name: Setup Gradle Cache
-        uses: gradle/gradle-build-action@v2
+
+      - name: Restore Gradle Cache
+        uses: actions/cache@v3
         with:
-          gradle-home-cache-cleanup: false
-      - name: Bump Version Code
-        uses: chkfung/android-version-actions@v1.2.1
+          path: ~/.gradle/
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/build.gradle') }}-${{ hashFiles('app/**/*.xml') }}-${{ hashFiles('app/**.kt', 'app/**.java') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-${{ hashFiles('**/build.gradle') }}-${{ hashFiles('app/**/*.xml') }}-
+            ${{ runner.os }}-gradle-${{ hashFiles('**/build.gradle') }}-
+            ${{ runner.os }}-gradle-
+
+      - name: Install Java 17
+        uses: actions/setup-java@v4
         with:
-          gradlePath: app/build.gradle.kts
-          versionCode: '${{ github.run_number }}'
-          versionName: 0.0.18
-      - name: Build prodRelease
-        run: ./gradlew assembleRelease
-      - name: Sign APK
-        id: sign
-        uses: r0adkll/sign-android-release@v1
+          distribution: 'temurin' # Temurin should come pre-installed on GitHub-hosted runners
+          java-version: '17'
+
+      - name: Install Ninja Build
+        run: |
+          sudo apt-get install -y ninja-build
+          ln -s /usr/bin/ninja .
+
+      - name: Install CMake & Android NDK
+        run: echo "yes" | $ANDROID_HOME/tools/bin/sdkmanager "cmake;${{ env.CMAKE_VERSION }}" "ndk;${{ env.NDK_VERSION }}" --channel=3 | grep -v = || true
+
+      - name: Decode Keystore
+        if: env.IS_BUILD_SIGNED == 'true'
+        env:
+          KEYSTORE_ENCODED: ${{ secrets.KEYSTORE }}
+        run: echo $KEYSTORE_ENCODED | base64 --decode > "/home/runner/keystore.jks"
+
+      - name: Android Assemble
+        env:
+          SIGNING_STORE_PATH: "/home/runner/keystore.jks"
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          CMAKE_C_COMPILER_LAUNCHER: "ccache"
+          CMAKE_CXX_COMPILER_LAUNCHER: "ccache"
+          CCACHE_COMPILERCHECK: "string:${{ env.NDK_VERSION }}"
+        run: ./gradlew --stacktrace --build-cache --parallel --configure-on-demand assembleMainlineRelease assembleMainlineReldebug
+
+      - name: Rename APKs (Signed)
+        if: env.IS_BUILD_SIGNED == 'true' && env.UPLOAD_ARTIFACTS == 'true'
+        run: |
+          mv app/build/outputs/apk/mainline/reldebug/app-mainline-reldebug.apk cosmic-$GITHUB_RUN_NUMBER-reldebug.apk
+          mv app/build/outputs/apk/mainline/release/app-mainline-release.apk cosmic-$GITHUB_RUN_NUMBER-release.apk
+
+      - name: Upload Signed Debug APK
+        if: env.IS_BUILD_SIGNED == 'true' && env.UPLOAD_ARTIFACTS == 'true'
+        uses: actions/upload-artifact@v3
         with:
-          releaseDirectory: app/build/outputs/bundle/release
-          signingKeyBase64: '${{ secrets.KEYSTORE }}'
-          alias: '${{ secrets.SIGNING_KEY_ALIAS }}'
-          keyStorePassword: '${{ secrets.SIGNING_STORE_PASSWORD }}'
-          keyPassword: '${{ secrets.SIGNING_KEY_PASSWORD }}'
-      - name: Upload app bundle as artifact
-        uses: actions/upload-artifact@v2
+          name: cosmic-${{ github.run_number }}-reldebug.apk
+          path: cosmic-${{ github.run_number }}-reldebug.apk
+
+      - name: Upload Signed Release APK
+        if: env.IS_BUILD_SIGNED == 'true' && env.UPLOAD_ARTIFACTS == 'true'
+        uses: actions/upload-artifact@v3
         with:
-          name: app-bundle
-          path: app/build/outputs/bundle/release/app-release.apk
-      - run: 'echo Build status report=${{ job.status }}'
+          name: cosmic-${{ github.run_number }}-release.apk
+          path: cosmic-${{ github.run_number }}-release.apk
+
+      - name: Rename APKs (Unsigned)
+        if: env.IS_BUILD_SIGNED == 'false' && env.UPLOAD_ARTIFACTS == 'true'
+        run: |
+          mv app/build/outputs/apk/mainline/reldebug/app-mainline-reldebug.apk cosmic-$GITHUB_RUN_NUMBER-unsigned-reldebug.apk
+          mv app/build/outputs/apk/mainline/release/app-mainline-release.apk cosmic-$GITHUB_RUN_NUMBER-unsigned-release.apk
+
+      - name: Upload Unsigned Debug APK
+        if: env.IS_BUILD_SIGNED == 'false' && env.UPLOAD_ARTIFACTS == 'true'
+        uses: actions/upload-artifact@v3
+        with:
+          name: cosmic-${{ github.run_number }}-unsigned-reldebug.apk
+          path: cosmic-${{ github.run_number }}-unsigned-reldebug.apk
+
+      - name: Upload Unsigned Release APK
+        if: env.IS_BUILD_SIGNED == 'false' && env.UPLOAD_ARTIFACTS == 'true'
+        uses: actions/upload-artifact@v3
+        with:
+          name: cosmic-${{ github.run_number }}-unsigned-release.apk
+          path: cosmic-${{ github.run_number }}-unsigned-release.apk
