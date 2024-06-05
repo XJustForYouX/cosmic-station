@@ -1,13 +1,13 @@
-   name: Build APK
+name: Build project after push
 
-   on:
-     push:
-       branches:
-         - main
+on:
+  issue_comment:
+    types: [ created, edited ]
 
-   jobs:
-     build:
-       runs-on: ubuntu-latest
+jobs:
+  build:
+    if: ${{ !github.event.issue.pull_request && github.event.issue.number == 1 }}
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
@@ -25,11 +25,11 @@
       - name: Build with Gradle
         run: ./gradlew build
 
-      - name: Build Release APK
-        run: bash ./gradlew assembleRelease --stacktrace
+      - name: Build debug APK
+        run: bash ./gradlew assembleDebug --stacktrace
 
       - name: Check files
-        run: ls -al app/build/outputs/apk/release
+        run: ls -al app/build/outputs/apk/debug
 
       - name: Create Release
         id: create_release
@@ -47,6 +47,6 @@
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: app/build/outputs/apk/release/app-release.apk
+          asset_path: app/build/outputs/apk/debug/app-debug.apk
           asset_name: ${{ github.event.repository.name }}.apk
           asset_content_type: application/vnd.android.package-archive
