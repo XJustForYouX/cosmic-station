@@ -11,7 +11,7 @@ jobs:
           submodules: 'recursive'
       - name: build
         run: |
-          cd cosmic-station/src/main
+          cd cosmic-station/app/src/main/
           ./gradlew assembleRelease 
       - name: upload
         uses: actions/upload-artifact@v4
