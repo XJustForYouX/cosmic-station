@@ -11,7 +11,7 @@ jobs:
           submodules: 'recursive'
       - name: build
         run: |
-          cd cosmic-station/app/
+          cd cosmic-station
           ./gradlew assembleRelease -Dorg.gradle.java.home=/usr/lib/jvm/temurin-17-jdk-amd64
       - name: upload
         uses: actions/upload-artifact@v4
