@@ -18,6 +18,9 @@ jobs:
         with:
           max-size: 3Gi
 
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
       - name: Restore Gradle Cache
         uses: actions/cache@v4
         with:
