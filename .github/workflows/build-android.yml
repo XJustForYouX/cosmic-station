@@ -11,7 +11,7 @@ on:
   #   - cron: "0 0 */7 * *"
 
 jobs:
-  suyu_android_build:
+  cosmic_android_build:
     permissions:
       contents: write
     runs-on: ubuntu-latest
