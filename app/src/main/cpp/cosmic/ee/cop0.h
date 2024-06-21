@@ -9,10 +9,8 @@ namespace cosmic::ee {
 }
 namespace cosmic::ee {
     static constexpr u8 cop0RegsCount{32};
-    class alignas(16) CopCacheLine {
-    public:
+    struct alignas(16) CopCacheLine {
         CopCacheLine() {
-
         }
         std::array<u32, 2> tags;
         bool lrf[2];
@@ -103,7 +101,7 @@ namespace cosmic::ee {
         void rectifyTimer(u32 pulseCycles);
 
         bool isCacheHit(u32 address, u8 lane, CacheMode mode = Instruction);
-        os::vec readCache(u32 address, CacheMode mode = Instruction);
+        const os::vec& readCache(u32 address, CacheMode mode = Instruction);
         void assignFlushedCache(CopCacheLine& eec, u32 tag, CacheMode mode = Instruction);
         void loadCacheLine(u32 address, EeMipsCore& core, CacheMode mode = Instruction);
         u32 getCachePfn(u32 address, CacheMode mode = Instruction);
@@ -132,7 +130,7 @@ namespace cosmic::ee {
         bool isIntEnabled();
     private:
         void incPerfByEvent(u32 mask, u32 cycles, u8 perfEv);
-        Ref<CopCacheLine> getCache(u32 mem, bool write, CacheMode mode = Instruction);
+        CopCacheLine& getCache(u32 mem, bool write, CacheMode mode = Instruction);
 
         std::array<CopCacheLine, 128> inCache;
         std::array<CopCacheLine, 64> dataCache;

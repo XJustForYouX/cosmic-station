@@ -68,24 +68,28 @@ namespace cosmic::ee {
             runCycles -= punishment / 2;
             return mipsRead<u32>(incPc());
         }
-        if (!cop0.isCacheHit(eePc, 0) && !cop0.isCacheHit(eePc, 1)) {
+        if (!cop0.isCacheHit(eePc, 0) &&
+            !cop0.isCacheHit(eePc, 1)) {
             cop0.loadCacheLine(eePc, *this);
         }
         auto pcCached{cop0.readCache(eePc)};
-        return pcCached.to32(incPc() & 3);
+        const u32 part{(incPc() & 0xf) / 4};
+        return pcCached.to32(part);
     }
     u32 EeMipsCore::fetchByAddress(u32 address) {
         lastPc = address;
         struct CachedAddress{
-            u32 base;
-            bool isBaseValid{};
-            std::array<u32, 4> nested;
-
-            u32 calcBase(u32 addr) const {
+            const u32 stripPcAddr(u32 addr) const {
                 return addr & 0xffff'fff0;
             }
+            auto& operator[](const u64 address) {
+                return nested[(address & 0xf) / 4];
+            }
+            u32 basePc;
+            bool isValid{};
+            std::array<u32, 4> nested;
         };
-        static CachedAddress cached;
+        static CachedAddress cached{};
 
         if (cop0.virtCache->isCached(address)) {
             if (!cop0.isCacheHit(address, 2)) {
@@ -95,18 +99,20 @@ namespace cosmic::ee {
             runCycles -= 8 / 2;
             return mipsRead<u32>(address);
         }
-        if (cached.isBaseValid)
-            cached.isBaseValid = cached.base == cached.calcBase(address);
-        if (!cached.isBaseValid) {
-            cached.nested[0] = cop0.readCache(address).to32(0);
-            cached.nested[1] = cop0.readCache(address).to32(1);
-            cached.nested[2] = cop0.readCache(address).to32(2);
-            cached.nested[3] = cop0.readCache(address).to32(3);
-            cached.base = cached.calcBase(address);
+        u32 currBase{cached.stripPcAddr(address)};
+        if (cached.isValid)
+            cached.isValid = currBase == cached.basePc;
 
-            cached.isBaseValid = true;
+        if (!cached.isValid) {
+            const auto fasterInstructions{cop0.readCache(address)};
+            cached[0] = fasterInstructions.to32(0);
+            cached[4] = fasterInstructions.to32(1);
+            cached[8] = fasterInstructions.to32(2);
+            cached[12] = fasterInstructions.to32(3);
+            cached.basePc = currBase;
+            cached.isValid = true;
         }
-        return cached.nested[(address & 0xf) / 0x4];
+        return cached[address];
     }
     EeMipsCore::EeMipsCore(std::shared_ptr<mio::MemoryPipe>& pipe) :
         cop0(pipe->controller),
@@ -120,9 +126,9 @@ namespace cosmic::ee {
             if (executor)
                 executor.reset();
             if (cpuMode == CachedInterpreter) {
-                executor = std::make_unique<creeper::MipsIvInterpreter>(*this);
+                executor = std::make_unique<creeper::MipsIvInterpreter>(Optional(*this));
             } else if (cpuMode == JitRe) {
-                executor = std::make_unique<fishron::EeArm64Jitter>(*this);
+                executor = std::make_unique<fishron::EeArm64Jitter>(Optional(*this));
             }
         });
     }
@@ -136,7 +142,7 @@ namespace cosmic::ee {
         if (!cond)
             return;
         isABranch = cond;
-        i64 pc{static_cast<i64>(eePc) + jumpRel + 4};
+        const auto pc{static_cast<i64>(eePc) + jumpRel + 4};
         eePc = static_cast<u32>(pc);
         delaySlot = 1;
     }
