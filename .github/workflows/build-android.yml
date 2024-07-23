@@ -1,75 +1,100 @@
-name: cosmic-android-build
+name: CI Cosmic
 
 on:
   workflow_dispatch:
-    inputs:
-      branch:
-        description: 'select branch to build(default: main)'
-        required: false
-        default: 'main'
-  # schedule:
-  #   - cron: "0 0 */7 * *"
+  push:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
 
 jobs:
-  cosmic_android_build:
-    permissions:
-      contents: write
+  build:
+    # Skip 'labeled' events that didn't add the 'ci' label
+    if: |
+      github.event_name != 'pull_request' ||
+      github.event.action != 'labeled' ||
+      github.event.label.name == 'ci'
     runs-on: ubuntu-latest
+    env:
+      JVM_OPTS: -Xmx6G
+      IS_BUILD_SIGNED: ${{ secrets.KEYSTORE != '' }}
+      UPLOAD_ARTIFACTS: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ci') }}
+      CMAKE_VERSION: "3.22.1"
+      NDK_VERSION: "26.1.10909125"
+      BUILD_TYPE: release
+
     steps:
-    - uses: actions/setup-java@v4
-      with:
-        distribution: temurin
-        java-version: 17
+      - name: Git Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
 
-    - name: Download cosmic source code
-      run: |
-        cd ${{ github.workspace }}
-        git clone --branch ${{ github.event.inputs.branch || 'main' }} https://github.com/XJustForYouX/cosmic-station.git --recursive
+      - name: Restore CCache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          max-size: 3Gi
 
-    - id: version
-      name: Get version
-      run: |
-        echo "date=$(/bin/date -u "+%Y%m%d")" >> $GITHUB_OUTPUT
-        cd ${{ github.workspace }}/cosmic-station
-        echo "hash=$(git log -1 --pretty=format:%H)" >> $GITHUB_OUTPUT
-        echo "short_hash=$(git describe --always --long)" >> $GITHUB_OUTPUT
-        echo "version=$(git describe --tags --always)" >> $GITHUB_OUTPUT
+      - name: Restore Gradle Cache
+        uses: actions/cache@v3
+        with:
+          path: ~/.gradle/
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/build.gradle') }}-${{ hashFiles('app/**/*.xml') }}-${{ hashFiles('app/**.kt', 'app/**.java') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-${{ hashFiles('**/build.gradle') }}-${{ hashFiles('app/**/*.xml') }}-
+            ${{ runner.os }}-gradle-${{ hashFiles('**/build.gradle') }}-
+            ${{ runner.os }}-gradle-
 
-    - name: Set up cache
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-          ~/.cache
-        key: ${{ runner.os }}-suyu-android-${{ steps.version.outputs.hash }}
-        restore-keys: |
-            ${{ runner.os }}-cosmic-station-
+      - name: Install Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
 
-    - name: Prepare environment
-      run: |
-        sudo apt-get install ccache glslang-dev glslang-tools
+      - name: Install Ninja Build
+        run: |
+          sudo apt-get install -y ninja-build
+          ln -s /usr/bin/ninja .
 
-    - name: Build Android
-      run: |
-        export NDK_CCACHE="$(which ccache)"
-        ccache -sv
-        cd ${{ github.workspace }}/cosmic-station
-        chmod +x ./gradlew
-        ./gradlew "assembleMainlineRelease"
-        mv app/build/outputs/apk/mainline/release/app-mainline-release.apk ${{ github.workspace }}/cosmic-android-mainline-${{ steps.version.outputs.date }}-${{ steps.version.outputs.version }}.apk
-        ccache -sv
+      - name: Install CMake & Android NDK
+        run: echo "yes" | $ANDROID_HOME/tools/bin/sdkmanager "cmake;${{ env.CMAKE_VERSION }}" "ndk;${{ env.NDK_VERSION }}" --channel=3 | grep -v = || true
 
-    - name: Release Cosmic Station (Cosmic-Station)
-      uses: softprops/action-gh-release@v2
-      with:
-        name: Cosmic Station ${{ steps.version.outputs.date }}
-        tag_name: cosmic-station
-        files: ${{ github.workspace }}/cosmic-android-mainline-${{ steps.version.outputs.date }}-${{ steps.version.outputs.version }}.apk
+      - name: Decode Keystore
+        if: env.IS_BUILD_SIGNED == 'true'
+        env:
+          KEYSTORE_ENCODED: ${{ secrets.KEYSTORE }}
+        run: | 
+          echo "$KEYSTORE_ENCODED" | base64 --decode > ${{ github.workspace }}/app/ks.jks
 
-    - name: Release Cosmic Android ${{ steps.version.outputs.date }}
-      uses: softprops/action-gh-release@v2
-      with:
-        name: ${{ steps.version.outputs.date }}
-        tag_name: ${{ steps.version.outputs.date }}
-        files: ${{ github.workspace }}/cosmic-android-mainline-${{ steps.version.outputs.date }}-${{ steps.version.outputs.version }}.apk
+      - name: Android Assemble
+        env:
+          SIGNING_STORE_PATH: "ks.jks"
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          CMAKE_C_COMPILER_LAUNCHER: "ccache"
+          CMAKE_CXX_COMPILER_LAUNCHER: "ccache"
+          CCACHE_COMPILERCHECK: "string:${{ env.NDK_VERSION }}"
+        run: ./gradlew --build-cache assembleFull${{ env.BUILD_TYPE }}
+
+      - name: Rename APKs (Signed)
+        if: env.IS_BUILD_SIGNED == 'true' && env.UPLOAD_ARTIFACTS == 'true'
+        run: |
+          mv app/build/outputs/apk/full/${{ env.BUILD_TYPE }}/app-full-${{ env.BUILD_TYPE }}.apk pine-emu-$GITHUB_RUN_NUMBER-${{ env.BUILD_TYPE }}.apk
+
+      - name: Upload Signed APK
+        if: env.IS_BUILD_SIGNED == 'true' && env.UPLOAD_ARTIFACTS == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cosmic-android-${{ github.run_number }}-${{ env.BUILD_TYPE }}.apk
+          path: cosmic-android-${{ github.run_number }}-${{ env.BUILD_TYPE }}.apk
+
+      - name: Rename APKs (Unsigned)
+        if: env.IS_BUILD_SIGNED == 'false' && env.UPLOAD_ARTIFACTS == 'true'
+        run: |
+          mv app/build/outputs/apk/full/${{ env.BUILD_TYPE }}/app-full-${{ env.BUILD_TYPE }}.apk pine-emu-$GITHUB_RUN_NUMBER-unsigned-${{ env.BUILD_TYPE }}.apk
+
+      - name: Upload Unsigned APK
+        if: env.IS_BUILD_SIGNED == 'false' && env.UPLOAD_ARTIFACTS == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cosmic-android-${{ github.run_number }}-unsigned-${{ env.BUILD_TYPE }}.apk
+          path: cosmic-android-${{ github.run_number }}-unsigned-${{ env.BUILD_TYPE }}.apk
