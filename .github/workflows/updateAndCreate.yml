@@ -12,7 +12,7 @@ on:
 jobs:
   syncro:
     runs-on: ubuntu-latest
-    environment: Android9
+    environment: Android
     name: Sync latest commits from upstream repo
     steps:
     - name: Checkout target repo
@@ -43,7 +43,7 @@ jobs:
       
   create-tag:
     runs-on: ubuntu-latest
-    environment: Android9
+    environment: Android
     needs: [syncro]
     if: ${{ needs.syncro.outputs.isUpdated == 'true' || github.event.inputs.android == 'true' }}
     steps:
