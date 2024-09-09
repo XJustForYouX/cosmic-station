@@ -13,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId = "emu.cosmic"
-        minSdk = 31
+        minSdk = 30
 
         //noinspection OldTargetApi
         targetSdk = 34
