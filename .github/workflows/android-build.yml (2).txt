@@ -1,0 +1,77 @@
+name: cosmic-android-build
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'select branch to build(default: main)'
+        required: false
+        default: 'main'
+      flavor:
+        description: 'select flavor to build(default: dev)'
+        required: false
+        default: 'dev'
+  schedule:
+    - cron: "0 0 */5 * *"
+
+jobs:
+  cosmic_android_build:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: 17
+
+    - name: Download Cosmic source code
+      run: |
+        cd ${{ github.workspace }}
+        git clone --branch ${{ github.event.inputs.branch || 'main' }} https://github.com/XJustForYouX/cosmic-station.git --recursive
+        cd cosmic-station
+        
+
+    - id: version
+      name: Get version
+      run: |
+        echo "date=$(/bin/date -u "+%Y%m%d")" >> $GITHUB_OUTPUT
+        cd ${{ github.workspace }}/cosmic-station
+        echo "hash=$(git log -1 --pretty=format:%H)" >> $GITHUB_OUTPUT
+        echo "short_hash=$(git describe --always --long)" >> $GITHUB_OUTPUT
+        echo "version=$(git describe --tags --always)" >> $GITHUB_OUTPUT
+
+    - name: Set up cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-cosmic-station-${{ steps.version.outputs.hash }}
+        restore-keys: |
+            ${{ runner.os }}-cosmic-station-
+
+    - name: Prepare environment
+      run: |
+        sudo apt-get install -y ninja-build
+          ln -s /usr/bin/ninja .
+    - name: Build Android
+      run: |
+        cd ${{ github.workspace }}/cosmic-station
+        chmod +x ./gradlew
+        ./gradlew "assemble${{ github.event.inputs.flavor || 'dev' }}Release"
+        # bash gradlew build
+        mv $(find app/build/outputs/apk -type f | grep -E "\.apk$") ${{ github.workspace }}/cosmic-station-${{ github.event.inputs.flavor || 'prod' }}-${{ steps.version.outputs.date }}-${{ steps.version.outputs.version }}.apk
+
+    - name: Release Cosmic (cosmic-station)
+      uses: softprops/action-gh-release@v2
+      with:
+        name: Cosmic-Station ${{ steps.version.outputs.date }}
+        tag_name: cosmic-station
+        files: ${{ github.workspace }}/cosmic-station-${{ github.event.inputs.flavor || 'dev' }}-${{ steps.version.outputs.date }}-${{ steps.version.outputs.version }}.apk
+
+    - name: Release Cosmic-Station ${{ steps.version.outputs.date }}
+      uses: softprops/action-gh-release@v2
+      with:
+        name: ${{ steps.version.outputs.date }}
+        tag_name: ${{ steps.version.outputs.date }}
+        files: ${{ github.workspace }}/cosmic-station-${{ github.event.inputs.flavor || 'dev' }}-${{ steps.version.outputs.date }}-${{ steps.version.outputs.version }}.apk
